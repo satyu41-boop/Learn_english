@@ -61,14 +61,32 @@ def download_video(url: str, output_dir: str) -> str:
     """Download Instagram video using yt-dlp."""
     video_id = str(uuid.uuid4())[:8]
     output_template = os.path.join(output_dir, f'{video_id}.%(ext)s')
+    
+    # Handle Cookies
+    # option 1: Netscape format (file)
+    # option 2: Raw cookie string (header)
+    cookie_data = os.getenv('INSTAGRAM_COOKIES')
+    use_cookies_file = False
+    
     cmd = [
         'yt-dlp',
         '--no-playlist',
         '--max-filesize', '100M',
         '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        '-o', output_template,
-        url
     ]
+
+    if cookie_data:
+        if '# Netscape HTTP Cookie File' in cookie_data or '\t' in cookie_data:
+            # It's a file content
+            cookie_file = 'cookies.txt'
+            with open(cookie_file, 'w') as f:
+                f.write(cookie_data)
+            cmd.extend(['--cookies', cookie_file])
+        else:
+            # It's likely a raw header string
+            cmd.extend(['--add-header', f'Cookie:{cookie_data}'])
+
+    cmd.extend(['-o', output_template, url])
     
     result = subprocess.run(cmd, capture_output=True, text=True)
     
