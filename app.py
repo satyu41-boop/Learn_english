@@ -88,12 +88,19 @@ def download_video(url: str, output_dir: str) -> str:
 
     cmd.extend(['-o', output_template, url])
     
+    # Debug logging
+    print(f"Executing command: {' '.join(cmd)}")
+    
     result = subprocess.run(cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
         error_msg = result.stderr or result.stdout
+        print(f"YT-DLP ERROR: {error_msg}")  # Log to Railway console
+        
         if 'login' in error_msg.lower() or 'private' in error_msg.lower():
-            raise Exception("This video is private or requires login. Only public videos are supported.")
+             # Fallback error message
+            raise Exception(f"Login Failed. Instagram blocked the request. Error details: {error_msg[:200]}...")
+            
         raise Exception(f"Failed to download video: {error_msg}")
     
     for f in os.listdir(output_dir):
