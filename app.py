@@ -93,18 +93,32 @@ def download_video(url: str, output_dir: str) -> str:
     raise Exception("Video downloaded but file not found")
 
 
+import shutil
+
 def extract_audio(video_path: str) -> str:
     """Extract audio from video using ffmpeg."""
     # If already audio (mp3/wav), just return or convert if needed
     ext = video_path.rsplit('.', 1)[1].lower()
     if ext in ['wav', 'mp3', 'm4a']:
-        # Whisper can handle these directly, but let's standardize to 16k wav for consistent results
         pass
 
     audio_path = video_path.rsplit('.', 1)[0] + '.wav'
     
+    # Robustly find ffmpeg
+    ffmpeg_binary = shutil.which('ffmpeg')
+    if not ffmpeg_binary:
+        # Common fallback locations
+        common_paths = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg']
+        for p in common_paths:
+            if os.path.exists(p):
+                ffmpeg_binary = p
+                break
+    
+    if not ffmpeg_binary:
+        raise Exception("FFmpeg binary not found in system PATH. Please install FFmpeg.")
+
     cmd = [
-        'ffmpeg',
+        ffmpeg_binary,
         '-i', video_path,
         '-vn',
         '-acodec', 'pcm_s16le',
@@ -114,11 +128,14 @@ def extract_audio(video_path: str) -> str:
         audio_path
     ]
     
+    # Debug logging
+    print(f"Executing FFmpeg: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
+        print(f"FFMPEG ERROR: {result.stderr}")
         raise Exception(f"Failed to extract audio: {result.stderr}")
-    
+        
     return audio_path
 
 
