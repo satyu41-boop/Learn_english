@@ -64,30 +64,27 @@ ALLOWED_EXTENSIONS = {'mp3', 'wav', 'mp4', 'm4a', 'mov', 'webm'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+import yt_dlp
+
 def download_video(url: str, output_dir: str) -> str:
-    """Download video from YouTube or other sources using yt-dlp."""
+    """Download video from YouTube or other sources using yt-dlp library."""
     video_id = str(uuid.uuid4())[:8]
-    output_template = os.path.join(output_dir, f'{video_id}.%(ext)s')
-    
-    # Generic download command for YouTube/Universal
-    # We use format 'bestaudio/best' to get smallest file with audio
-    cmd = [
-        'yt-dlp',
-        '--no-playlist',
-        '--max-filesize', '200M',
-        '-f', 'bestaudio/best',
-        '-o', output_template,
-        url
-    ]
-    
-    # Debug logging
-    print(f"Executing command: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        error_msg = result.stderr or result.stdout
-        print(f"YT-DLP ERROR: {error_msg}")
-        raise Exception(f"Download failed. If using Instagram, try YouTube instead. Error: {error_msg[:200]}...")
+    # Configure yt-dlp
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(output_dir, f'{video_id}.%(ext)s'),
+        'noplaylist': True,
+        'max_filesize': 200 * 1024 * 1024, # 200MB
+        'quiet': True,
+        'no_warnings': True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        print(f"YT-DLP ERROR: {str(e)}")
+        raise Exception(f"Download failed. Error: {str(e)[:200]}...")
     
     for f in os.listdir(output_dir):
         if f.startswith(video_id):
