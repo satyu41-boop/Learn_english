@@ -61,11 +61,11 @@ def download_video(url: str, output_dir: str) -> str:
     """Download Instagram video using yt-dlp."""
     video_id = str(uuid.uuid4())[:8]
     output_template = os.path.join(output_dir, f'{video_id}.%(ext)s')
-    
     cmd = [
         'yt-dlp',
         '--no-playlist',
         '--max-filesize', '100M',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         '-o', output_template,
         url
     ]
