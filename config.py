@@ -18,7 +18,7 @@ DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_NAME = os.getenv('DB_NAME', 'instagram_transcriber')
 
 # Get DATABASE_URL or build it
-uri = os.getenv('DATABASE_URL')
+uri = os.getenv('DATABASE_URL') or os.getenv('MYSQL_URL')
 if uri and uri.startswith('mysql://'):
     uri = uri.replace('mysql://', 'mysql+pymysql://', 1)
 
