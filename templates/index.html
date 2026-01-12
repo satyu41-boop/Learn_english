@@ -171,19 +171,44 @@
             <!-- Input Section (for logged in users) -->
             <div id="main-content" class="hidden">
                 <div class="input-section">
-                    <label for="url-input" class="input-label">Paste Instagram Video URL</label>
-                    <div class="input-wrapper">
-                        <input type="url" id="url-input" class="url-input"
-                            placeholder="https://www.instagram.com/reel/..." autocomplete="off">
-                        <button id="transcribe-btn" class="transcribe-btn">
-                            <span class="btn-text">Transcribe</span>
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="url">Paste Link</button>
+                        <button class="tab-btn" data-tab="upload">Upload File</button>
+                    </div>
+
+                    <!-- URL Tab -->
+                    <div id="tab-url" class="tab-content active">
+                        <label for="url-input" class="input-label">Paste Video URL (YouTube, Instagram, etc)</label>
+                        <div class="input-wrapper">
+                            <input type="url" id="url-input" class="url-input" placeholder="https://youtube.com/..."
+                                autocomplete="off">
+                            <button id="transcribe-btn-url" class="transcribe-btn">
+                                <span class="btn-text">Transcribe Link</span>
+                                <span class="btn-loading">
+                                    <span class="spinner"></span>Processing...
+                                </span>
+                            </button>
+                        </div>
+                        <p class="input-hint">Supports YouTube, Instagram, TikTok, and more!</p>
+                    </div>
+
+                    <!-- Upload Tab -->
+                    <div id="tab-upload" class="tab-content">
+                        <label for="file-input" class="upload-area" id="upload-area">
+                            <span class="upload-icon">📁</span>
+                            <span class="upload-text">Click to Upload Video/Audio</span>
+                            <span class="upload-subtext">mp3, wav, mp4, m4a, mov (Max 200MB)</span>
+                            <input type="file" id="file-input" accept=".mp3,.wav,.mp4,.m4a,.mov" hidden>
+                        </label>
+                        <div id="file-rec-name" class="hidden"
+                            style="margin-top: 1rem; color: var(--success-color); font-weight: 500;"></div>
+                        <button id="transcribe-btn-upload" class="transcribe-btn hidden" style="margin-top: 1rem;">
+                            <span class="btn-text">Transcribe File</span>
                             <span class="btn-loading">
-                                <span class="spinner"></span>
-                                Processing...
+                                <span class="spinner"></span>Processing...
                             </span>
                         </button>
                     </div>
-                    <p class="input-hint">Supports reels, videos, and IGTV (public videos only)</p>
                 </div>
 
                 <!-- Progress Section -->
@@ -269,7 +294,7 @@
 
         // ==================== DOM Elements ====================
         const urlInput = document.getElementById('url-input');
-        const transcribeBtn = document.getElementById('transcribe-btn');
+
         const progressSection = document.getElementById('progress-section');
         const progressText = document.getElementById('progress-text');
         const errorSection = document.getElementById('error-section');
@@ -570,8 +595,10 @@
             hideSection(progressSection);
             hideSection(errorSection);
             hideSection(resultSection);
-            transcribeBtn.classList.remove('loading');
-            transcribeBtn.disabled = false;
+            document.getElementById('transcribe-btn-url').classList.remove('loading');
+            document.getElementById('transcribe-btn-url').disabled = false;
+            document.getElementById('transcribe-btn-upload').classList.remove('loading');
+            document.getElementById('transcribe-btn-upload').disabled = false;
             clearInterval(progressInterval);
             currentProgress = 0;
             currentTranscriptId = null;
@@ -613,23 +640,65 @@
 
         // ==================== Transcribe ====================
 
-        async function transcribe() {
-            const url = urlInput.value.trim();
+        // ==================== Tabs & Upload Logic ====================
+        const tabs = document.querySelectorAll('.tab-btn');
+        const contents = document.querySelectorAll('.tab-content');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-rec-name');
+        const uploadBtn = document.getElementById('transcribe-btn-upload');
 
-            if (!url) {
-                showError('Please enter an Instagram URL');
-                urlInput.focus();
-                return;
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                contents.forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        document.getElementById('upload-area').addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileNameDisplay.textContent = `Selected: ${file.name}`;
+                fileNameDisplay.classList.remove('hidden');
+                uploadBtn.classList.remove('hidden');
+                document.getElementById('upload-area').classList.add('file-selected');
+            }
+        });
+
+        // ==================== Transcribe ====================
+
+        async function transcribe(mode) {
+            const btn = mode === 'url' ? document.getElementById('transcribe-btn-url') : document.getElementById('transcribe-btn-upload');
+            const urlInput = document.getElementById('url-input');
+
+            let body;
+            let headers = {};
+
+            if (mode === 'url') {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    showError('Please enter a Video URL');
+                    urlInput.focus();
+                    return;
+                }
+                body = JSON.stringify({ url });
+                headers['Content-Type'] = 'application/json';
+            } else {
+                const file = fileInput.files[0];
+                if (!file) {
+                    showError('Please select a file');
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('file', file);
+                body = formData;
             }
 
-            if (!url.includes('instagram.com') && !url.includes('instagr.am')) {
-                showError('Please enter a valid Instagram URL');
-                urlInput.focus();
-                return;
-            }
-
-            transcribeBtn.classList.add('loading');
-            transcribeBtn.disabled = true;
+            btn.classList.add('loading');
+            btn.disabled = true;
             hideSection(errorSection);
             hideSection(resultSection);
             startProgress();
@@ -637,8 +706,8 @@
             try {
                 const response = await fetch('/transcribe', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url }),
+                    headers: headers, // fetch handles boundary for FormData if simple
+                    body: body,
                 });
 
                 const data = await response.json();
@@ -649,8 +718,16 @@
                     showError(data.error || 'Failed to transcribe video');
                 }
             } catch (error) {
-                showError('Network error. Please check your connection and try again.');
+                showError('Network error. Please check your connection or file size (Max 200MB).');
+                console.error(error);
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
             }
+        }
+
+        function startTranscription(mode) {
+            transcribe(mode);
         }
 
         // ==================== Copy & Download ====================
@@ -728,9 +805,12 @@
         });
 
         // Transcribe
-        transcribeBtn.addEventListener('click', transcribe);
+        // Transcribe Buttons
+        document.getElementById('transcribe-btn-url').addEventListener('click', () => transcribe('url'));
+        document.getElementById('transcribe-btn-upload').addEventListener('click', () => transcribe('upload'));
+
         urlInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') transcribe();
+            if (e.key === 'Enter') transcribe('url');
         });
 
         // Results

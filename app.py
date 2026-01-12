@@ -57,51 +57,37 @@ def get_whisper_model():
     return _whisper_model
 
 
+from werkzeug.utils import secure_filename
+
+ALLOWED_EXTENSIONS = {'mp3', 'wav', 'mp4', 'm4a', 'mov', 'webm'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def download_video(url: str, output_dir: str) -> str:
-    """Download Instagram video using yt-dlp."""
+    """Download video from YouTube or other sources using yt-dlp."""
     video_id = str(uuid.uuid4())[:8]
     output_template = os.path.join(output_dir, f'{video_id}.%(ext)s')
     
-    # Handle Cookies
-    # option 1: Netscape format (file)
-    # option 2: Raw cookie string (header)
-    cookie_data = os.getenv('INSTAGRAM_COOKIES')
-    use_cookies_file = False
-    
+    # Generic download command for YouTube/Universal
+    # We use format 'bestaudio/best' to get smallest file with audio
     cmd = [
         'yt-dlp',
         '--no-playlist',
-        '--max-filesize', '100M',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        '--max-filesize', '200M',
+        '-f', 'bestaudio/best',
+        '-o', output_template,
+        url
     ]
-
-    if cookie_data:
-        if '# Netscape HTTP Cookie File' in cookie_data or '\t' in cookie_data:
-            # It's a file content
-            cookie_file = 'cookies.txt'
-            with open(cookie_file, 'w') as f:
-                f.write(cookie_data)
-            cmd.extend(['--cookies', cookie_file])
-        else:
-            # It's likely a raw header string
-            cmd.extend(['--add-header', f'Cookie:{cookie_data}'])
-
-    cmd.extend(['-o', output_template, url])
     
     # Debug logging
     print(f"Executing command: {' '.join(cmd)}")
-    
     result = subprocess.run(cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
         error_msg = result.stderr or result.stdout
-        print(f"YT-DLP ERROR: {error_msg}")  # Log to Railway console
-        
-        if 'login' in error_msg.lower() or 'private' in error_msg.lower():
-             # Fallback error message
-            raise Exception(f"Login Failed. Instagram blocked the request. Error details: {error_msg[:200]}...")
-            
-        raise Exception(f"Failed to download video: {error_msg}")
+        print(f"YT-DLP ERROR: {error_msg}")
+        raise Exception(f"Download failed. If using Instagram, try YouTube instead. Error: {error_msg[:200]}...")
     
     for f in os.listdir(output_dir):
         if f.startswith(video_id):
@@ -112,6 +98,12 @@ def download_video(url: str, output_dir: str) -> str:
 
 def extract_audio(video_path: str) -> str:
     """Extract audio from video using ffmpeg."""
+    # If already audio (mp3/wav), just return or convert if needed
+    ext = video_path.rsplit('.', 1)[1].lower()
+    if ext in ['wav', 'mp3', 'm4a']:
+        # Whisper can handle these directly, but let's standardize to 16k wav for consistent results
+        pass
+
     audio_path = video_path.rsplit('.', 1)[0] + '.wav'
     
     cmd = [
@@ -292,22 +284,43 @@ def update_profile():
 @app.route('/transcribe', methods=['POST'])
 @login_required
 def transcribe():
-    """Transcribe an Instagram video."""
+    """Transcribe a video (from URL or File Upload)."""
     try:
-        data = request.get_json()
-        url = data.get('url', '').strip()
-        
-        if not url:
-            return jsonify({'success': False, 'error': 'Please provide an Instagram URL'}), 400
-        
-        if 'instagram.com' not in url and 'instagr.am' not in url:
-            return jsonify({'success': False, 'error': 'Please provide a valid Instagram URL'}), 400
-        
+        url = None
+        video_path = None
         temp_dir = os.path.join(DOWNLOAD_DIR, str(uuid.uuid4()))
         os.makedirs(temp_dir, exist_ok=True)
         
         try:
-            video_path = download_video(url, temp_dir)
+            # Check if it's a file upload
+            if 'file' in request.files:
+                file = request.files['file']
+                if file.filename == '':
+                    return jsonify({'success': False, 'error': 'No file selected'}), 400
+                
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    video_path = os.path.join(temp_dir, filename)
+                    file.save(video_path)
+                    url = f"File: {filename}"  # Placeholder for DB
+                else:
+                    return jsonify({'success': False, 'error': 'Invalid file type. Allowed: mp3, wav, mp4, m4a, mov'}), 400
+            
+            # Check if it's a URL
+            else:
+                # Handle JSON or Form data
+                if request.is_json:
+                    data = request.get_json()
+                    url = data.get('url', '').strip()
+                else:
+                    url = request.form.get('url', '').strip()
+                
+                if not url:
+                    return jsonify({'success': False, 'error': 'Please provide a Video URL or upload a file'}), 400
+                
+                video_path = download_video(url, temp_dir)
+
+            # Process the video/audio
             audio_path = extract_audio(video_path)
             result = transcribe_audio(audio_path)
             transcript = format_transcript(result)
@@ -324,7 +337,7 @@ def transcribe():
             # Save transcript to database
             transcript_record = Transcript(
                 user_id=current_user.id,
-                instagram_url=url,
+                instagram_url=url,  # We use this field for both URL and Filename
                 transcript_text=transcript,
                 language=language,
                 line_count=line_count
