@@ -17,10 +17,12 @@ DB_PASSWORD = os.getenv('DB_PASSWORD', 'transcriber123')
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_NAME = os.getenv('DB_NAME', 'instagram_transcriber')
 
-SQLALCHEMY_DATABASE_URI = os.getenv(
-    'DATABASE_URL', 
-    f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
-)
+# Get DATABASE_URL or build it
+uri = os.getenv('DATABASE_URL')
+if uri and uri.startswith('mysql://'):
+    uri = uri.replace('mysql://', 'mysql+pymysql://', 1)
+
+SQLALCHEMY_DATABASE_URI = uri or f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Whisper settings
