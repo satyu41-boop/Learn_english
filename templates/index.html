@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Video Transcriber - Free Speech-to-Text Tool</title>
+    <meta name="description"
+        content="Free tool to extract and transcribe speech from Instagram videos, reels, and IGTV. Powered by Whisper AI.">
+    <meta name="keywords"
+        content="instagram transcriber, video to text, speech to text, reel transcriber, instagram caption generator">
+    <meta name="author" content="Instagram Transcriber">
+
+    <!-- Open Graph for social sharing -->
+    <meta property="og:title" content="Instagram Video Transcriber">
+    <meta property="og:description" content="Free tool to extract speech from Instagram videos">
+    <meta property="og:type" content="website">
+
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Google Analytics - Replace GA_MEASUREMENT_ID with your ID -->
+    {% if config.GA_MEASUREMENT_ID %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GA_MEASUREMENT_ID }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', '{{ config.GA_MEASUREMENT_ID }}');
+
+        // Track custom events
+        function trackEvent(eventName, params) {
+            gtag('event', eventName, params);
+        }
+    </script>
+    {% endif %}
+
+    <!-- Google AdSense - Replace with your Publisher ID -->
+    {% if config.ADSENSE_PUB_ID %}
+    <script async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ config.ADSENSE_PUB_ID }}"
+        crossorigin="anonymous"></script>
+    {% endif %}
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-top">
+                <div class="logo">
+                    <span class="logo-icon">🎬</span>
+                    <h1>Instagram Transcriber</h1>
+                </div>
+                <div class="user-area" id="user-area">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+            <p class="tagline">Extract speech from Instagram videos — 100% free & local</p>
+        </header>
+
+        <!-- Auth Modal -->
+        <div class="modal-overlay hidden" id="auth-modal">
+            <div class="modal">
+                <button class="modal-close" id="modal-close">&times;</button>
+
+                <!-- Login Form -->
+                <div id="login-form" class="auth-form">
+                    <h2>Welcome Back</h2>
+                    <p class="auth-subtitle">Log in to transcribe videos</p>
+
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" placeholder="••••••••"
+                            autocomplete="current-password">
+                    </div>
+
+                    <button class="auth-btn" id="login-btn">Log In</button>
+
+                    <p class="auth-switch">
+                        Don't have an account? <a href="#" id="show-register">Sign up</a>
+                    </p>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-form" class="auth-form hidden">
+                    <h2>Create Account</h2>
+                    <p class="auth-subtitle">Sign up to start transcribing</p>
+
+                    <div class="form-group">
+                        <label for="register-name">Name (optional)</label>
+                        <input type="text" id="register-name" placeholder="Your name" autocomplete="name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" placeholder="you@example.com" autocomplete="email">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" placeholder="At least 6 characters"
+                            autocomplete="new-password">
+                    </div>
+
+                    <button class="auth-btn" id="register-btn">Create Account</button>
+
+                    <p class="auth-switch">
+                        Already have an account? <a href="#" id="show-login">Log in</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Send Modal -->
+        <div class="modal-overlay hidden" id="send-modal">
+            <div class="modal">
+                <button class="modal-close" id="send-modal-close">&times;</button>
+
+                <div class="send-form">
+                    <h2 id="send-modal-title">Send Transcript</h2>
+                    <p class="auth-subtitle" id="send-modal-subtitle">Enter recipient details</p>
+
+                    <!-- Email Send -->
+                    <div id="email-send-form" class="hidden">
+                        <div class="form-group">
+                            <label for="recipient-email">Recipient Email</label>
+                            <input type="email" id="recipient-email" placeholder="recipient@example.com">
+                        </div>
+                        <button class="auth-btn" id="send-email-now-btn">
+                            <span class="btn-text">📧 Send Email</span>
+                            <span class="btn-loading hidden">Sending...</span>
+                        </button>
+                    </div>
+
+                    <!-- WhatsApp Send -->
+                    <div id="whatsapp-send-form" class="hidden">
+                        <div class="form-group">
+                            <label for="recipient-whatsapp">WhatsApp Number</label>
+                            <input type="tel" id="recipient-whatsapp" placeholder="+919876543210">
+                            <span class="input-hint">Include country code (e.g., +91 for India)</span>
+                        </div>
+                        <button class="auth-btn" id="send-whatsapp-now-btn">
+                            <span class="btn-text">💬 Send WhatsApp</span>
+                            <span class="btn-loading hidden">Sending...</span>
+                        </button>
+                    </div>
+
+                    <p class="send-status hidden" id="send-status"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <main class="card">
+            <!-- Guest Message -->
+            <div id="guest-message" class="guest-message hidden">
+                <div class="guest-icon">🔐</div>
+                <h3>Login Required</h3>
+                <p>Create a free account to transcribe Instagram videos and send transcripts via email or WhatsApp.</p>
+                <button class="auth-btn" id="guest-login-btn">Get Started</button>
+            </div>
+
+            <!-- Input Section (for logged in users) -->
+            <div id="main-content" class="hidden">
+                <div class="input-section">
+                    <label for="url-input" class="input-label">Paste Instagram Video URL</label>
+                    <div class="input-wrapper">
+                        <input type="url" id="url-input" class="url-input"
+                            placeholder="https://www.instagram.com/reel/..." autocomplete="off">
+                        <button id="transcribe-btn" class="transcribe-btn">
+                            <span class="btn-text">Transcribe</span>
+                            <span class="btn-loading">
+                                <span class="spinner"></span>
+                                Processing...
+                            </span>
+                        </button>
+                    </div>
+                    <p class="input-hint">Supports reels, videos, and IGTV (public videos only)</p>
+                </div>
+
+                <!-- Progress Section -->
+                <div id="progress-section" class="progress-section hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <p class="progress-text" id="progress-text">Initializing...</p>
+                </div>
+
+                <!-- Error Section -->
+                <div id="error-section" class="error-section hidden">
+                    <div class="error-icon">⚠️</div>
+                    <p class="error-message" id="error-message"></p>
+                    <button class="retry-btn" id="retry-btn">Try Again</button>
+                </div>
+
+                <!-- Result Section -->
+                <div id="result-section" class="result-section hidden">
+                    <div class="result-header">
+                        <div class="result-info">
+                            <span class="result-badge" id="language-badge">English</span>
+                            <span class="result-lines" id="line-count">0 lines</span>
+                        </div>
+                        <div class="result-actions">
+                            <button class="action-btn" id="copy-btn" title="Copy to clipboard">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                <span>Copy</span>
+                            </button>
+                            <button class="action-btn" id="download-btn" title="Download as text file">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <span>Download</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="transcript-container">
+                        <pre class="transcript" id="transcript"></pre>
+                    </div>
+
+                    <!-- Send Options -->
+                    <div class="delivery-section">
+                        <h4>Send Transcript To:</h4>
+                        <div class="delivery-buttons">
+                            <button class="delivery-btn email" id="open-email-modal">
+                                <span class="delivery-icon">📧</span>
+                                <span>Email</span>
+                            </button>
+                            <button class="delivery-btn whatsapp" id="open-whatsapp-modal">
+                                <span class="delivery-icon">💬</span>
+                                <span>WhatsApp</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="new-btn" id="new-btn">Transcribe Another Video</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by <strong>Whisper AI</strong> • Runs locally on your machine • No data sent to external servers
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // ==================== State ====================
+        let currentUser = null;
+        let currentTranscriptId = null;
+        let currentTranscript = '';
+        let currentVideoUrl = '';
+
+        // ==================== DOM Elements ====================
+        const urlInput = document.getElementById('url-input');
+        const transcribeBtn = document.getElementById('transcribe-btn');
+        const progressSection = document.getElementById('progress-section');
+        const progressText = document.getElementById('progress-text');
+        const errorSection = document.getElementById('error-section');
+        const errorMessage = document.getElementById('error-message');
+        const retryBtn = document.getElementById('retry-btn');
+        const resultSection = document.getElementById('result-section');
+        const transcriptEl = document.getElementById('transcript');
+        const languageBadge = document.getElementById('language-badge');
+        const lineCount = document.getElementById('line-count');
+        const copyBtn = document.getElementById('copy-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const newBtn = document.getElementById('new-btn');
+
+        // Auth elements
+        const authModal = document.getElementById('auth-modal');
+        const userArea = document.getElementById('user-area');
+        const guestMessage = document.getElementById('guest-message');
+        const mainContent = document.getElementById('main-content');
+
+        // Send modal elements
+        const sendModal = document.getElementById('send-modal');
+        const sendModalTitle = document.getElementById('send-modal-title');
+        const sendModalSubtitle = document.getElementById('send-modal-subtitle');
+        const emailSendForm = document.getElementById('email-send-form');
+        const whatsappSendForm = document.getElementById('whatsapp-send-form');
+        const sendStatus = document.getElementById('send-status');
+
+        // Progress messages
+        const progressMessages = [
+            'Downloading video from Instagram...',
+            'Extracting audio track...',
+            'Transcribing speech (this may take a moment)...',
+            'Formatting transcript...'
+        ];
+
+        let progressInterval;
+        let currentProgress = 0;
+
+        // ==================== Auth Functions ====================
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/me');
+                const data = await response.json();
+
+                if (data.authenticated) {
+                    currentUser = data.user;
+                    showLoggedInUI();
+                } else {
+                    currentUser = null;
+                    showGuestUI();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                showGuestUI();
+            }
+        }
+
+        function showLoggedInUI() {
+            guestMessage.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+
+            userArea.innerHTML = `
+                <span class="user-name">${currentUser.name || currentUser.email}</span>
+                <button class="user-btn" id="logout-btn" title="Logout">🚪</button>
+            `;
+
+            document.getElementById('logout-btn').addEventListener('click', logout);
+        }
+
+        function showGuestUI() {
+            guestMessage.classList.remove('hidden');
+            mainContent.classList.add('hidden');
+
+            userArea.innerHTML = `
+                <button class="login-header-btn" id="header-login-btn">Log In</button>
+            `;
+
+            document.getElementById('header-login-btn').addEventListener('click', () => showAuthModal('login'));
+        }
+
+        function showAuthModal(mode = 'login') {
+            authModal.classList.remove('hidden');
+            if (mode === 'login') {
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+            } else {
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('register-form').classList.remove('hidden');
+            }
+        }
+
+        function hideAuthModal() {
+            authModal.classList.add('hidden');
+        }
+
+        async function register() {
+            const name = document.getElementById('register-name').value.trim();
+            const email = document.getElementById('register-email').value.trim();
+            const password = document.getElementById('register-password').value;
+
+            if (!email || !password) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUser = data.user;
+                    hideAuthModal();
+                    showLoggedInUI();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Registration failed. Please try again.');
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUser = data.user;
+                    hideAuthModal();
+                    showLoggedInUI();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Login failed. Please try again.');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/logout', { method: 'POST' });
+                currentUser = null;
+                showGuestUI();
+                resetUI();
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+
+        // ==================== Send Modal Functions ====================
+
+        function showSendModal(type) {
+            sendModal.classList.remove('hidden');
+            emailSendForm.classList.add('hidden');
+            whatsappSendForm.classList.add('hidden');
+            sendStatus.classList.add('hidden');
+
+            if (type === 'email') {
+                sendModalTitle.textContent = '📧 Send via Email';
+                sendModalSubtitle.textContent = 'Enter recipient email address';
+                emailSendForm.classList.remove('hidden');
+                document.getElementById('recipient-email').focus();
+            } else if (type === 'whatsapp') {
+                sendModalTitle.textContent = '💬 Send via WhatsApp';
+                sendModalSubtitle.textContent = 'Enter recipient WhatsApp number';
+                whatsappSendForm.classList.remove('hidden');
+                document.getElementById('recipient-whatsapp').focus();
+            }
+        }
+
+        function hideSendModal() {
+            sendModal.classList.add('hidden');
+        }
+
+        async function sendEmail() {
+            const recipientEmail = document.getElementById('recipient-email').value.trim();
+
+            if (!recipientEmail) {
+                showSendStatus('Please enter an email address', 'error');
+                return;
+            }
+
+            if (!recipientEmail.includes('@')) {
+                showSendStatus('Please enter a valid email address', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('send-email-now-btn');
+            btn.disabled = true;
+            btn.querySelector('.btn-text').classList.add('hidden');
+            btn.querySelector('.btn-loading').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/send-direct', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'email',
+                        recipient: recipientEmail,
+                        transcript_id: currentTranscriptId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSendStatus(`✅ Email sent to ${recipientEmail}!`, 'success');
+                    setTimeout(hideSendModal, 2000);
+                } else {
+                    showSendStatus(`❌ ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showSendStatus('❌ Failed to send. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.querySelector('.btn-text').classList.remove('hidden');
+                btn.querySelector('.btn-loading').classList.add('hidden');
+            }
+        }
+
+        async function sendWhatsApp() {
+            const recipientWhatsApp = document.getElementById('recipient-whatsapp').value.trim();
+
+            if (!recipientWhatsApp) {
+                showSendStatus('Please enter a WhatsApp number', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('send-whatsapp-now-btn');
+            btn.disabled = true;
+            btn.querySelector('.btn-text').classList.add('hidden');
+            btn.querySelector('.btn-loading').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/send-direct', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'whatsapp',
+                        recipient: recipientWhatsApp,
+                        transcript_id: currentTranscriptId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSendStatus(`✅ WhatsApp sent to ${recipientWhatsApp}!`, 'success');
+                    setTimeout(hideSendModal, 2000);
+                } else {
+                    showSendStatus(`❌ ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showSendStatus('❌ Failed to send. Please try again.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.querySelector('.btn-text').classList.remove('hidden');
+                btn.querySelector('.btn-loading').classList.add('hidden');
+            }
+        }
+
+        function showSendStatus(message, type) {
+            sendStatus.textContent = message;
+            sendStatus.classList.remove('hidden', 'success', 'error');
+            sendStatus.classList.add(type);
+        }
+
+        // ==================== UI Helpers ====================
+
+        function showSection(section) {
+            section.classList.remove('hidden');
+        }
+
+        function hideSection(section) {
+            section.classList.add('hidden');
+        }
+
+        function resetUI() {
+            hideSection(progressSection);
+            hideSection(errorSection);
+            hideSection(resultSection);
+            transcribeBtn.classList.remove('loading');
+            transcribeBtn.disabled = false;
+            clearInterval(progressInterval);
+            currentProgress = 0;
+            currentTranscriptId = null;
+            currentTranscript = '';
+            currentVideoUrl = '';
+        }
+
+        function startProgress() {
+            showSection(progressSection);
+            currentProgress = 0;
+            progressText.textContent = progressMessages[0];
+
+            progressInterval = setInterval(() => {
+                currentProgress++;
+                if (currentProgress < progressMessages.length) {
+                    progressText.textContent = progressMessages[currentProgress];
+                }
+            }, 3000);
+        }
+
+        function showError(message) {
+            resetUI();
+            errorMessage.textContent = message;
+            showSection(errorSection);
+        }
+
+        function showResult(data) {
+            resetUI();
+            currentTranscriptId = data.transcript_id;
+            currentTranscript = data.transcript;
+            currentVideoUrl = data.url || urlInput.value.trim();
+
+            transcriptEl.textContent = data.transcript;
+            languageBadge.textContent = data.language.charAt(0).toUpperCase() + data.language.slice(1);
+            lineCount.textContent = `${data.line_count} lines`;
+
+            showSection(resultSection);
+        }
+
+        // ==================== Transcribe ====================
+
+        async function transcribe() {
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                showError('Please enter an Instagram URL');
+                urlInput.focus();
+                return;
+            }
+
+            if (!url.includes('instagram.com') && !url.includes('instagr.am')) {
+                showError('Please enter a valid Instagram URL');
+                urlInput.focus();
+                return;
+            }
+
+            transcribeBtn.classList.add('loading');
+            transcribeBtn.disabled = true;
+            hideSection(errorSection);
+            hideSection(resultSection);
+            startProgress();
+
+            try {
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showResult(data);
+                } else {
+                    showError(data.error || 'Failed to transcribe video');
+                }
+            } catch (error) {
+                showError('Network error. Please check your connection and try again.');
+            }
+        }
+
+        // ==================== Copy & Download ====================
+
+        async function copyToClipboard() {
+            try {
+                await navigator.clipboard.writeText(transcriptEl.textContent);
+                const originalText = copyBtn.querySelector('span').textContent;
+                copyBtn.querySelector('span').textContent = 'Copied!';
+                copyBtn.classList.add('success');
+                setTimeout(() => {
+                    copyBtn.querySelector('span').textContent = originalText;
+                    copyBtn.classList.remove('success');
+                }, 2000);
+            } catch (error) {
+                showError('Failed to copy to clipboard');
+            }
+        }
+
+        function downloadTranscript() {
+            const text = transcriptEl.textContent;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'instagram-transcript.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ==================== Event Listeners ====================
+
+        // Auth modal
+        document.getElementById('modal-close').addEventListener('click', hideAuthModal);
+        document.getElementById('show-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            showAuthModal('register');
+        });
+        document.getElementById('show-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            showAuthModal('login');
+        });
+        document.getElementById('login-btn').addEventListener('click', login);
+        document.getElementById('register-btn').addEventListener('click', register);
+        document.getElementById('guest-login-btn').addEventListener('click', () => showAuthModal('register'));
+
+        // Enter key for auth forms
+        document.getElementById('login-password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+        document.getElementById('register-password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') register();
+        });
+
+        // Send modal
+        document.getElementById('send-modal-close').addEventListener('click', hideSendModal);
+        document.getElementById('open-email-modal').addEventListener('click', () => showSendModal('email'));
+        document.getElementById('open-whatsapp-modal').addEventListener('click', () => showSendModal('whatsapp'));
+        document.getElementById('send-email-now-btn').addEventListener('click', sendEmail);
+        document.getElementById('send-whatsapp-now-btn').addEventListener('click', sendWhatsApp);
+
+        // Enter key for send forms
+        document.getElementById('recipient-email').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendEmail();
+        });
+        document.getElementById('recipient-whatsapp').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendWhatsApp();
+        });
+
+        // Close send modal on overlay click
+        sendModal.addEventListener('click', (e) => {
+            if (e.target === sendModal) hideSendModal();
+        });
+
+        // Transcribe
+        transcribeBtn.addEventListener('click', transcribe);
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') transcribe();
+        });
+
+        // Results
+        retryBtn.addEventListener('click', () => {
+            resetUI();
+            urlInput.focus();
+        });
+        newBtn.addEventListener('click', () => {
+            resetUI();
+            urlInput.value = '';
+            urlInput.focus();
+        });
+        copyBtn.addEventListener('click', copyToClipboard);
+        downloadBtn.addEventListener('click', downloadTranscript);
+
+        // Close modal on overlay click
+        authModal.addEventListener('click', (e) => {
+            if (e.target === authModal) hideAuthModal();
+        });
+
+        // ==================== Initialize ====================
+        checkAuth();
+    </script>
+</body>
+
+</html>

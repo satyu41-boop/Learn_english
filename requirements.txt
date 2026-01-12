@@ -1,0 +1,10 @@
+flask
+flask-login
+flask-sqlalchemy
+yt-dlp
+openai-whisper
+python-dotenv
+twilio
+pymysql
+cryptography
+gunicorn
