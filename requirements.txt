@@ -10,3 +10,4 @@ twilio
 pymysql
 cryptography
 gunicorn
+static-ffmpeg

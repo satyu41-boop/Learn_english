@@ -94,6 +94,10 @@ def download_video(url: str, output_dir: str) -> str:
 
 
 import shutil
+import static_ffmpeg
+
+# Auto-install/provision ffmpeg binary
+static_ffmpeg.add_paths()
 
 def extract_audio(video_path: str) -> str:
     """Extract audio from video using ffmpeg."""
@@ -104,21 +108,9 @@ def extract_audio(video_path: str) -> str:
 
     audio_path = video_path.rsplit('.', 1)[0] + '.wav'
     
-    # Robustly find ffmpeg
-    ffmpeg_binary = shutil.which('ffmpeg')
-    if not ffmpeg_binary:
-        # Common fallback locations
-        common_paths = ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg']
-        for p in common_paths:
-            if os.path.exists(p):
-                ffmpeg_binary = p
-                break
-    
-    if not ffmpeg_binary:
-        raise Exception("FFmpeg binary not found in system PATH. Please install FFmpeg.")
-
+    # static-ffmpeg adds 'ffmpeg' to the PATH automatically
     cmd = [
-        ffmpeg_binary,
+        'ffmpeg',
         '-i', video_path,
         '-vn',
         '-acodec', 'pcm_s16le',
